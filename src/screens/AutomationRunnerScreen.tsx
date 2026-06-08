@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { AccountsStackParamList } from '../navigation/types';
@@ -44,19 +44,6 @@ const AUTOFILL_SCRIPT = (email: string, password: string) => `
 })();
 `;
 
-/**
- * Wipes whatever the in-app browser picked up (cache, nav history, autofill data)
- * so a Netflix session from a previously-managed account can't bleed into this run —
- * paired with `incognito` on the WebView so nothing it loads gets persisted either.
- */
-function clearWebViewSession(ref: React.RefObject<WebView | null>) {
-  ref.current?.clearCache?.(true);
-  if (Platform.OS === 'android') {
-    ref.current?.clearHistory?.();
-    ref.current?.clearFormData?.();
-  }
-}
-
 const STEPS_BY_MODE: Record<Props['route']['params']['mode'], string[]> = {
   password: [
     'We try to pre-fill your stored email & password on the Netflix sign-in page.',
@@ -75,7 +62,6 @@ const STEPS_BY_MODE: Record<Props['route']['params']['mode'], string[]> = {
 export default function AutomationRunnerScreen({ navigation, route }: Props) {
   const { accountId, mode, profileSlot } = route.params;
   const webviewRef = useRef<WebView>(null);
-  const clearedOnEntryRef = useRef(false);
   const [credentials, setCredentials] = useState<{ email: string; password: string } | null>(null);
   const [showRecordForm, setShowRecordForm] = useState(false);
   const [newValue, setNewValue] = useState('');
@@ -85,10 +71,6 @@ export default function AutomationRunnerScreen({ navigation, route }: Props) {
       title: mode === 'password' ? 'Change password' : `Change profile ${profileSlot} name`,
     });
   }, [navigation, mode, profileSlot]);
-
-  useEffect(() => {
-    return () => clearWebViewSession(webviewRef);
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -171,14 +153,9 @@ export default function AutomationRunnerScreen({ navigation, route }: Props) {
         {credentials ? (
           <WebView
             ref={webviewRef}
-            incognito
             source={{ uri: mode === 'password' ? NETFLIX_LOGIN_URL : NETFLIX_LOGIN_URL }}
             injectedJavaScript={AUTOFILL_SCRIPT(credentials.email, credentials.password)}
             onLoadEnd={() => {
-              if (!clearedOnEntryRef.current) {
-                clearedOnEntryRef.current = true;
-                clearWebViewSession(webviewRef);
-              }
               webviewRef.current?.injectJavaScript(AUTOFILL_SCRIPT(credentials.email, credentials.password));
             }}
             style={styles.webview}
