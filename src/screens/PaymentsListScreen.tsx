@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, SectionList, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { File } from 'expo-file-system';
@@ -8,7 +8,7 @@ import type { Customer, Payment } from '../types';
 import { listCustomers } from '../db/customers';
 import { deletePayment, listPayments } from '../db/payments';
 import { colors } from '../utils/theme';
-import { formatCurrency, formatDate } from '../utils/format';
+import { formatCurrency, formatDate, formatMonthYear } from '../utils/format';
 
 function deleteProofImage(uri: string | null) {
   if (!uri) return;
@@ -52,6 +52,26 @@ export default function PaymentsListScreen({ navigation }: Props) {
 
   const total = payments.reduce((sum, p) => sum + p.amount, 0);
 
+  const sections = useMemo(() => {
+    const groups = new Map<string, Payment[]>();
+    payments.forEach((payment) => {
+      const key = payment.datePaid.slice(0, 7);
+      const group = groups.get(key);
+      if (group) {
+        group.push(payment);
+      } else {
+        groups.set(key, [payment]);
+      }
+    });
+    return Array.from(groups.entries())
+      .sort(([a], [b]) => (a < b ? 1 : a > b ? -1 : 0))
+      .map(([period, data]) => ({
+        title: formatMonthYear(period),
+        total: data.reduce((sum, p) => sum + p.amount, 0),
+        data,
+      }));
+  }, [payments]);
+
   const handleDelete = (payment: Payment) => {
     const customer = customerById.get(payment.customerId);
     Alert.alert(
@@ -81,13 +101,19 @@ export default function PaymentsListScreen({ navigation }: Props) {
         </Text>
       </View>
 
-      <FlatList
-        data={payments}
+      <SectionList
+        sections={sections}
         keyExtractor={(item) => String(item.id)}
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
           <Text style={styles.emptyText}>No payments recorded yet. Log one when a member pays.</Text>
         }
+        renderSectionHeader={({ section }) => (
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>{section.title}</Text>
+            <Text style={styles.sectionTotal}>{formatCurrency(section.total)}</Text>
+          </View>
+        )}
         renderItem={({ item }) => {
           const customer = customerById.get(item.customerId);
           return (
@@ -133,6 +159,15 @@ const styles = StyleSheet.create({
   headerSubtitle: { color: colors.textMuted, fontSize: 14, marginTop: 2 },
   listContent: { padding: 16, paddingBottom: 100 },
   emptyText: { color: colors.textMuted, textAlign: 'center', marginTop: 40, paddingHorizontal: 24 },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    paddingTop: 16,
+  },
+  sectionTitle: { color: colors.text, fontSize: 15, fontWeight: '700' },
+  sectionTotal: { color: colors.textMuted, fontSize: 13, fontWeight: '600' },
   card: {
     flexDirection: 'row',
     alignItems: 'center',

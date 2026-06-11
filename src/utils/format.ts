@@ -17,6 +17,13 @@ export function formatDate(iso: string): string {
   return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
+/** Formats a `YYYY-MM` period string as a long month and year, e.g. "June 2026". */
+export function formatMonthYear(period: string): string {
+  const [year, month] = period.split('-').map(Number);
+  const d = new Date(year, (month || 1) - 1, 1);
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'long' });
+}
+
 function clampToMonth(year: number, month: number, day: number): Date {
   const lastDay = new Date(year, month + 1, 0).getDate();
   return new Date(year, month, Math.min(day, lastDay));
