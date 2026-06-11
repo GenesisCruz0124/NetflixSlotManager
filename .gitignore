@@ -46,3 +46,6 @@ yarn-error.*
 # Claude Code local/runtime files
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
+
+# Local signing credentials
+credentials.json

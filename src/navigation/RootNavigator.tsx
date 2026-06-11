@@ -20,6 +20,7 @@ import AccountsListScreen from '../screens/AccountsListScreen';
 import AccountFormScreen from '../screens/AccountFormScreen';
 import AccountDetailScreen from '../screens/AccountDetailScreen';
 import AutomationRunnerScreen from '../screens/AutomationRunnerScreen';
+import SettingsScreen from '../screens/SettingsScreen';
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
 const CustomersStack = createNativeStackNavigator<CustomersStackParamList>();
@@ -68,6 +69,7 @@ const TAB_ICONS: Record<keyof RootTabParamList, keyof typeof Ionicons.glyphMap> 
   Customers: 'people',
   Sales: 'cash',
   Accounts: 'tv',
+  Settings: 'settings',
 };
 
 const navigationTheme = {
@@ -100,6 +102,7 @@ export default function RootNavigator() {
         <Tab.Screen name="Customers" component={CustomersNavigator} options={{ title: 'Members' }} />
         <Tab.Screen name="Sales" component={SalesNavigator} />
         <Tab.Screen name="Accounts" component={AccountsNavigator} />
+        <Tab.Screen name="Settings" component={SettingsScreen} />
       </Tab.Navigator>
     </NavigationContainer>
   );

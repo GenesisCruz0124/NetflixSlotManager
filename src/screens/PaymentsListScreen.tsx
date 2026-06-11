@@ -98,7 +98,7 @@ export default function PaymentsListScreen({ navigation }: Props) {
               <View style={styles.cardBody}>
                 <Text style={styles.cardTitle}>{customer ? customer.name : 'Unknown member'}</Text>
                 <Text style={styles.cardSubtitle}>
-                  {formatDate(item.datePaid)} · for {item.periodCovered}
+                  {formatDate(item.datePaid)} · {formatDate(item.periodFrom)}–{formatDate(item.periodTo)}
                   {item.method ? ` · ${item.method}` : ''}
                   {item.proofImage ? ' · 📎 proof attached' : ''}
                 </Text>

@@ -9,7 +9,7 @@ import { listCustomers } from '../db/customers';
 import { listPayments } from '../db/payments';
 import { listAccounts } from '../db/accounts';
 import { colors } from '../utils/theme';
-import { currentPeriod, daysUntilNextBilling, formatCurrency } from '../utils/format';
+import { currentPeriod, daysUntilNextBilling, formatCurrency, formatDate, nextBillingDateIso, todayIso } from '../utils/format';
 
 type Props = BottomTabScreenProps<RootTabParamList, 'Dashboard'>;
 
@@ -41,17 +41,18 @@ export default function DashboardScreen(_props: Props) {
     const activeCustomers = customers.filter((c) => c.status === 'active');
 
     const revenueThisPeriod = payments
-      .filter((p) => p.periodCovered === period)
+      .filter((p) => p.periodFrom.slice(0, 7) === period)
       .reduce((sum, p) => sum + p.amount, 0);
 
-    const paidCustomerIds = new Set(
-      payments.filter((p) => p.periodCovered === period).map((p) => p.customerId)
-    );
-    const outstanding = activeCustomers.filter((c) => !paidCustomerIds.has(c.id));
+    const isCoveredOn = (customerId: number, dateIso: string) =>
+      payments.some((p) => p.customerId === customerId && p.periodFrom <= dateIso && dateIso <= p.periodTo);
+
+    const today = todayIso();
+    const outstanding = activeCustomers.filter((c) => !isCoveredOn(c.id, today));
 
     const upcoming = activeCustomers
-      .map((c) => ({ customer: c, days: daysUntilNextBilling(c.billingDay) }))
-      .filter(({ days }) => days <= 7)
+      .map((c) => ({ customer: c, days: daysUntilNextBilling(c.billingDay), nextDate: nextBillingDateIso(c.billingDay) }))
+      .filter(({ days, customer, nextDate }) => days <= 7 && !isCoveredOn(customer.id, nextDate))
       .sort((a, b) => a.days - b.days);
 
     const expectedRevenue = activeCustomers.reduce((sum, c) => sum + c.monthlyPrice, 0);
@@ -70,6 +71,22 @@ export default function DashboardScreen(_props: Props) {
       totalSlots,
     };
   }, [customers, payments, accounts]);
+
+  const lastPaymentByCustomer = useMemo(() => {
+    const map = new Map<number, Payment>();
+    for (const p of payments) {
+      const existing = map.get(p.customerId);
+      if (!existing || p.datePaid > existing.datePaid || (p.datePaid === existing.datePaid && p.id > existing.id)) {
+        map.set(p.customerId, p);
+      }
+    }
+    return map;
+  }, [payments]);
+
+  const lastPaymentSubtitle = (customerId: number) => {
+    const last = lastPaymentByCustomer.get(customerId);
+    return last ? `Last paid ${formatDate(last.datePaid)} · ${formatCurrency(last.amount)}` : 'No payments yet';
+  };
 
   return (
     <ScrollView
@@ -97,7 +114,13 @@ export default function DashboardScreen(_props: Props) {
           <Text style={styles.emptyText}>Everyone active has paid for this period. Nice.</Text>
         ) : (
           stats.outstanding.map((c) => (
-            <Row key={c.id} left={c.name} right={formatCurrency(c.monthlyPrice)} accent={colors.warning} />
+            <Row
+              key={c.id}
+              left={c.name}
+              right={formatCurrency(c.monthlyPrice)}
+              accent={colors.warning}
+              subtitle={lastPaymentSubtitle(c.id)}
+            />
           ))
         )}
       </Section>
@@ -112,6 +135,7 @@ export default function DashboardScreen(_props: Props) {
               left={customer.name}
               right={days === 0 ? 'Due today' : `in ${days} day${days === 1 ? '' : 's'}`}
               accent={days <= 1 ? colors.danger : colors.warning}
+              subtitle={lastPaymentSubtitle(customer.id)}
             />
           ))
         )}
@@ -151,10 +175,23 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function Row({ left, right, accent }: { left: string; right: string; accent?: string }) {
+function Row({
+  left,
+  right,
+  accent,
+  subtitle,
+}: {
+  left: string;
+  right: string;
+  accent?: string;
+  subtitle?: string;
+}) {
   return (
     <View style={styles.itemRow}>
-      <Text style={styles.itemLeft}>{left}</Text>
+      <View style={styles.itemLeftCol}>
+        <Text style={styles.itemLeft}>{left}</Text>
+        {subtitle ? <Text style={styles.itemSubtitle}>{subtitle}</Text> : null}
+      </View>
       <Text style={[styles.itemRight, accent ? { color: accent } : null]}>{right}</Text>
     </View>
   );
@@ -181,6 +218,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
   },
+  itemLeftCol: { flex: 1, marginRight: 12 },
   itemLeft: { color: colors.text, fontSize: 14 },
+  itemSubtitle: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
   itemRight: { color: colors.textMuted, fontSize: 14, fontWeight: '600' },
 });

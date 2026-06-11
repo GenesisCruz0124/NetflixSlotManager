@@ -29,7 +29,8 @@ export interface Payment {
   customerId: number;
   amount: number;
   datePaid: string;
-  periodCovered: string;
+  periodFrom: string;
+  periodTo: string;
   method: string | null;
   notes: string | null;
   proofImage: string | null;

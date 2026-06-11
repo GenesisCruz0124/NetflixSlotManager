@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { Directory, File, Paths } from 'expo-file-system';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -8,8 +9,7 @@ import type { Customer } from '../types';
 import { listCustomers } from '../db/customers';
 import { createPayment, deletePayment, getPayment, listPaymentsForCustomer, updatePayment } from '../db/payments';
 import DateField from '../components/DateField';
-import MonthField from '../components/MonthField';
-import { currentPeriod, formatCurrency, formatDate, todayIso } from '../utils/format';
+import { formatCurrency, formatDate, todayIso } from '../utils/format';
 import { colors } from '../utils/theme';
 
 type Props = NativeStackScreenProps<SalesStackParamList, 'PaymentForm'>;
@@ -37,6 +37,7 @@ function deleteProofImage(uri: string | null) {
 }
 
 export default function PaymentFormScreen({ navigation, route }: Props) {
+  const insets = useSafeAreaInsets();
   const paymentId = route.params?.paymentId;
   const isEditing = paymentId != null;
 
@@ -45,11 +46,14 @@ export default function PaymentFormScreen({ navigation, route }: Props) {
   const [customerId, setCustomerId] = useState<number | null>(route.params?.customerId ?? null);
   const [amount, setAmount] = useState('');
   const [datePaid, setDatePaid] = useState(todayIso());
-  const [periodCovered, setPeriodCovered] = useState(currentPeriod());
+  const [periodFrom, setPeriodFrom] = useState(todayIso());
+  const [periodTo, setPeriodTo] = useState(todayIso());
   const [method, setMethod] = useState('');
   const [notes, setNotes] = useState('');
   const [proofImage, setProofImage] = useState<string | null>(null);
   const [originalProofImage, setOriginalProofImage] = useState<string | null>(null);
+  const [previewVisible, setPreviewVisible] = useState(false);
+  const [memberPickerVisible, setMemberPickerVisible] = useState(false);
   const [loaded, setLoaded] = useState(!isEditing);
 
   useEffect(() => {
@@ -75,7 +79,8 @@ export default function PaymentFormScreen({ navigation, route }: Props) {
       setCustomerId(payment.customerId);
       setAmount(String(payment.amount));
       setDatePaid(payment.datePaid);
-      setPeriodCovered(payment.periodCovered);
+      setPeriodFrom(payment.periodFrom);
+      setPeriodTo(payment.periodTo);
       setMethod(payment.method ?? '');
       setNotes(payment.notes ?? '');
       setProofImage(payment.proofImage);
@@ -90,6 +95,13 @@ export default function PaymentFormScreen({ navigation, route }: Props) {
   const selectCustomer = (customer: Customer) => {
     setCustomerId(customer.id);
     if (!amount) setAmount(String(customer.monthlyPrice));
+    setMemberPickerVisible(false);
+    setMemberQuery('');
+  };
+
+  const closeMemberPicker = () => {
+    setMemberPickerVisible(false);
+    setMemberQuery('');
   };
 
   const filteredCustomers = customers.filter((c) =>
@@ -151,9 +163,12 @@ export default function PaymentFormScreen({ navigation, route }: Props) {
       Alert.alert('Invalid amount', 'Enter a valid payment amount.');
       return;
     }
-    const trimmedPeriod = periodCovered.trim();
-    if (!trimmedPeriod) {
-      Alert.alert('Missing period', 'Enter which billing period this payment covers, e.g. 2026-06.');
+    if (!periodFrom || !periodTo) {
+      Alert.alert('Missing period', 'Select both a from and to date for the billing period.');
+      return;
+    }
+    if (periodTo < periodFrom) {
+      Alert.alert('Invalid period', 'The "to" date must be on or after the "from" date.');
       return;
     }
 
@@ -163,7 +178,8 @@ export default function PaymentFormScreen({ navigation, route }: Props) {
         customerId: id,
         amount: parsedAmount,
         datePaid,
-        periodCovered: trimmedPeriod,
+        periodFrom,
+        periodTo,
         method: method.trim() || null,
         notes: notes.trim() || null,
         proofImage,
@@ -182,7 +198,7 @@ export default function PaymentFormScreen({ navigation, route }: Props) {
 
     if (!isEditing) {
       const existingForPeriod = (await listPaymentsForCustomer(id)).filter(
-        (p) => p.periodCovered === trimmedPeriod
+        (p) => p.periodFrom === periodFrom
       );
 
       if (existingForPeriod.length > 0) {
@@ -192,7 +208,7 @@ export default function PaymentFormScreen({ navigation, route }: Props) {
           .join(', ');
         Alert.alert(
           'Possible double payment',
-          `${customerName} already has ${existingForPeriod.length === 1 ? 'a payment' : 'payments'} logged for ${trimmedPeriod}: ${summary}. Log this one too?`,
+          `${customerName} already has ${existingForPeriod.length === 1 ? 'a payment' : 'payments'} starting ${formatDate(periodFrom)}: ${summary}. Log this one too?`,
           [
             { text: 'Cancel', style: 'cancel' },
             { text: 'Log anyway', style: 'destructive', onPress: () => { submit(); } },
@@ -208,14 +224,15 @@ export default function PaymentFormScreen({ navigation, route }: Props) {
   if (!loaded) return null;
 
   return (
+    <>
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.label}>Member</Text>
       {customers.length === 0 ? (
         <Text style={styles.emptyText}>Add a member first before logging a payment.</Text>
       ) : (
-        <View>
+        <Pressable style={styles.memberSelector} onPress={() => setMemberPickerVisible(true)}>
           {selectedCustomer ? (
-            <View style={styles.selectedMemberBanner}>
+            <>
               <View style={styles.memberAvatar}>
                 <Text style={styles.memberAvatarText}>{selectedCustomer.name.charAt(0).toUpperCase()}</Text>
               </View>
@@ -225,45 +242,12 @@ export default function PaymentFormScreen({ navigation, route }: Props) {
                   Slot {selectedCustomer.profileSlot} · {formatCurrency(selectedCustomer.monthlyPrice)}/mo
                 </Text>
               </View>
-            </View>
-          ) : null}
-
-          <TextInput
-            style={styles.searchInput}
-            value={memberQuery}
-            onChangeText={setMemberQuery}
-            placeholder="Search members by name…"
-            placeholderTextColor={colors.textMuted}
-          />
-
-          <View style={styles.memberList}>
-            {filteredCustomers.length === 0 ? (
-              <Text style={styles.emptyText}>No members match “{memberQuery}”.</Text>
-            ) : (
-              filteredCustomers.map((c) => {
-                const active = customerId === c.id;
-                return (
-                  <Pressable
-                    key={c.id}
-                    style={[styles.memberCard, active && styles.memberCardActive]}
-                    onPress={() => selectCustomer(c)}
-                  >
-                    <View style={[styles.memberAvatar, active && styles.memberAvatarActive]}>
-                      <Text style={styles.memberAvatarText}>{c.name.charAt(0).toUpperCase()}</Text>
-                    </View>
-                    <View style={styles.memberBody}>
-                      <Text style={styles.memberName}>{c.name}</Text>
-                      <Text style={styles.memberMeta}>
-                        Slot {c.profileSlot} · {formatCurrency(c.monthlyPrice)}/mo
-                      </Text>
-                    </View>
-                    {active ? <Text style={styles.memberCheck}>✓</Text> : null}
-                  </Pressable>
-                );
-              })
-            )}
-          </View>
-        </View>
+            </>
+          ) : (
+            <Text style={styles.memberSelectorPlaceholder}>Select a member…</Text>
+          )}
+          <Text style={styles.memberSelectorChevron}>›</Text>
+        </Pressable>
       )}
 
       <Text style={styles.label}>Amount received</Text>
@@ -279,8 +263,10 @@ export default function PaymentFormScreen({ navigation, route }: Props) {
       <Text style={styles.label}>Date paid</Text>
       <DateField value={datePaid} onChange={setDatePaid} />
 
-      <Text style={styles.label}>Billing period covered</Text>
-      <MonthField value={periodCovered} onChange={setPeriodCovered} />
+      <Text style={styles.label}>Period covered — from</Text>
+      <DateField value={periodFrom} onChange={setPeriodFrom} />
+      <Text style={styles.label}>to</Text>
+      <DateField value={periodTo} onChange={setPeriodTo} />
 
       <Text style={styles.label}>Method (optional)</Text>
       <TextInput
@@ -303,7 +289,9 @@ export default function PaymentFormScreen({ navigation, route }: Props) {
       <Text style={styles.label}>Proof of payment (optional)</Text>
       {proofImage ? (
         <View style={styles.proofPreviewWrap}>
-          <Image source={{ uri: proofImage }} style={styles.proofPreview} resizeMode="cover" />
+          <Pressable onPress={() => setPreviewVisible(true)}>
+            <Image source={{ uri: proofImage }} style={styles.proofPreview} resizeMode="cover" />
+          </Pressable>
           <View style={styles.proofActionsRow}>
             <Pressable style={styles.proofActionButton} onPress={handlePickPhoto}>
               <Text style={styles.proofActionButtonText}>Replace photo</Text>
@@ -329,6 +317,66 @@ export default function PaymentFormScreen({ navigation, route }: Props) {
         </Pressable>
       ) : null}
     </ScrollView>
+
+    <Modal visible={previewVisible} transparent animationType="fade" onRequestClose={() => setPreviewVisible(false)}>
+      <Pressable style={styles.previewBackdrop} onPress={() => setPreviewVisible(false)}>
+        {proofImage ? (
+          <Image source={{ uri: proofImage }} style={styles.previewImage} resizeMode="contain" />
+        ) : null}
+        <Pressable style={styles.previewCloseButton} onPress={() => setPreviewVisible(false)}>
+          <Text style={styles.previewCloseButtonText}>✕</Text>
+        </Pressable>
+      </Pressable>
+    </Modal>
+
+    <Modal visible={memberPickerVisible} animationType="slide" onRequestClose={closeMemberPicker}>
+      <View style={[styles.pickerContainer, { paddingTop: insets.top + 16 }]}>
+        <View style={styles.pickerHeader}>
+          <Text style={styles.pickerTitle}>Select member</Text>
+          <Pressable onPress={closeMemberPicker}>
+            <Text style={styles.pickerCloseText}>Done</Text>
+          </Pressable>
+        </View>
+
+        <TextInput
+          style={styles.searchInput}
+          value={memberQuery}
+          onChangeText={setMemberQuery}
+          placeholder="Search members by name…"
+          placeholderTextColor={colors.textMuted}
+          autoFocus
+        />
+
+        <ScrollView style={styles.pickerList} contentContainerStyle={styles.memberList}>
+          {filteredCustomers.length === 0 ? (
+            <Text style={styles.emptyText}>No members match “{memberQuery}”.</Text>
+          ) : (
+            filteredCustomers.map((c) => {
+              const active = customerId === c.id;
+              return (
+                <Pressable
+                  key={c.id}
+                  style={[styles.memberCard, active && styles.memberCardActive]}
+                  onPress={() => selectCustomer(c)}
+                >
+                  <View style={[styles.memberAvatar, active && styles.memberAvatarActive]}>
+                    <Text style={styles.memberAvatarText}>{c.name.charAt(0).toUpperCase()}</Text>
+                  </View>
+                  <View style={styles.memberBody}>
+                    <Text style={styles.memberName}>{c.name}</Text>
+                    <Text style={styles.memberMeta}>
+                      Slot {c.profileSlot} · {formatCurrency(c.monthlyPrice)}/mo
+                    </Text>
+                  </View>
+                  {active ? <Text style={styles.memberCheck}>✓</Text> : null}
+                </Pressable>
+              );
+            })
+          )}
+        </ScrollView>
+      </View>
+    </Modal>
+    </>
   );
 }
 
@@ -358,18 +406,29 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     marginBottom: 10,
   },
-  selectedMemberBanner: {
+  memberSelector: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: colors.surfaceAlt,
+    backgroundColor: colors.surface,
     borderRadius: 10,
     padding: 12,
-    marginBottom: 12,
     borderWidth: 1,
-    borderColor: colors.primary,
+    borderColor: colors.border,
   },
-  memberList: { gap: 8 },
+  memberSelectorPlaceholder: { flex: 1, color: colors.textMuted, fontSize: 15 },
+  memberSelectorChevron: { color: colors.textMuted, fontSize: 22, fontWeight: '700' },
+  pickerContainer: { flex: 1, backgroundColor: colors.background, paddingHorizontal: 20 },
+  pickerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  pickerTitle: { color: colors.text, fontSize: 18, fontWeight: '700' },
+  pickerCloseText: { color: colors.primary, fontWeight: '700', fontSize: 15 },
+  pickerList: { flex: 1 },
+  memberList: { gap: 8, paddingBottom: 24 },
   memberCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -441,4 +500,23 @@ const styles = StyleSheet.create({
     borderColor: colors.danger,
   },
   deleteButtonText: { color: colors.danger, fontWeight: '700', fontSize: 15 },
+  previewBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.92)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  previewImage: { width: '100%', height: '100%' },
+  previewCloseButton: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceAlt,
+  },
+  previewCloseButtonText: { color: colors.text, fontSize: 18, fontWeight: '700' },
 });

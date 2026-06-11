@@ -22,6 +22,7 @@ async function openAndInit(): Promise<SQLite.SQLiteDatabase> {
   const customersNeedsMigration = await tableExists(db, 'customers') && !(await columnExists(db, 'customers', 'account_id'));
   const changeLogNeedsMigration = await tableExists(db, 'change_log') && !(await columnExists(db, 'change_log', 'account_id'));
   const paymentsNeedsProofImage = await tableExists(db, 'payments') && !(await columnExists(db, 'payments', 'proof_image'));
+  const paymentsNeedsPeriodRange = await tableExists(db, 'payments') && !(await columnExists(db, 'payments', 'period_from'));
 
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS accounts (
@@ -49,7 +50,9 @@ async function openAndInit(): Promise<SQLite.SQLiteDatabase> {
       customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
       amount REAL NOT NULL,
       date_paid TEXT NOT NULL,
-      period_covered TEXT NOT NULL,
+      period_covered TEXT NOT NULL DEFAULT '',
+      period_from TEXT NOT NULL DEFAULT '',
+      period_to TEXT NOT NULL DEFAULT '',
       method TEXT,
       notes TEXT,
       proof_image TEXT
@@ -73,6 +76,19 @@ async function openAndInit(): Promise<SQLite.SQLiteDatabase> {
 
   if (paymentsNeedsProofImage) {
     await db.execAsync('ALTER TABLE payments ADD COLUMN proof_image TEXT');
+  }
+
+  if (paymentsNeedsPeriodRange) {
+    await db.execAsync(`
+      ALTER TABLE payments ADD COLUMN period_from TEXT NOT NULL DEFAULT '';
+      ALTER TABLE payments ADD COLUMN period_to TEXT NOT NULL DEFAULT '';
+    `);
+    await db.execAsync(`
+      UPDATE payments
+      SET period_from = period_covered || '-01',
+          period_to   = date(period_covered || '-01', '+1 month', '-1 day')
+      WHERE period_from = '';
+    `);
   }
 
   await db.execAsync(`

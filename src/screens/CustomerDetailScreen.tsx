@@ -213,7 +213,7 @@ export default function CustomerDetailScreen({ navigation, route }: Props) {
             <View>
               <Text style={styles.paymentAmount}>{formatCurrency(item.amount)}</Text>
               <Text style={styles.paymentMeta}>
-                {formatDate(item.datePaid)} · for {item.periodCovered}
+                {formatDate(item.datePaid)} · {formatDate(item.periodFrom)}–{formatDate(item.periodTo)}
                 {item.method ? ` · ${item.method}` : ''}
               </Text>
             </View>

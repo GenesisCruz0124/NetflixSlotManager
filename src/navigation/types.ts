@@ -21,4 +21,5 @@ export type RootTabParamList = {
   Customers: undefined;
   Sales: undefined;
   Accounts: undefined;
+  Settings: undefined;
 };

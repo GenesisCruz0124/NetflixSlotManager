@@ -6,7 +6,8 @@ interface PaymentRow {
   customer_id: number;
   amount: number;
   date_paid: string;
-  period_covered: string;
+  period_from: string;
+  period_to: string;
   method: string | null;
   notes: string | null;
   proof_image: string | null;
@@ -18,7 +19,8 @@ function fromRow(row: PaymentRow): Payment {
     customerId: row.customer_id,
     amount: row.amount,
     datePaid: row.date_paid,
-    periodCovered: row.period_covered,
+    periodFrom: row.period_from,
+    periodTo: row.period_to,
     method: row.method,
     notes: row.notes,
     proofImage: row.proof_image,
@@ -51,12 +53,13 @@ export async function getPayment(id: number): Promise<Payment | null> {
 export async function createPayment(input: NewPayment): Promise<number> {
   const db = await getDb();
   const result = await db.runAsync(
-    `INSERT INTO payments (customer_id, amount, date_paid, period_covered, method, notes, proof_image)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO payments (customer_id, amount, date_paid, period_from, period_to, method, notes, proof_image)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     input.customerId,
     input.amount,
     input.datePaid,
-    input.periodCovered,
+    input.periodFrom,
+    input.periodTo,
     input.method,
     input.notes,
     input.proofImage
@@ -67,12 +70,13 @@ export async function createPayment(input: NewPayment): Promise<number> {
 export async function updatePayment(id: number, input: NewPayment): Promise<void> {
   const db = await getDb();
   await db.runAsync(
-    `UPDATE payments SET customer_id = ?, amount = ?, date_paid = ?, period_covered = ?, method = ?, notes = ?, proof_image = ?
+    `UPDATE payments SET customer_id = ?, amount = ?, date_paid = ?, period_from = ?, period_to = ?, method = ?, notes = ?, proof_image = ?
      WHERE id = ?`,
     input.customerId,
     input.amount,
     input.datePaid,
-    input.periodCovered,
+    input.periodFrom,
+    input.periodTo,
     input.method,
     input.notes,
     input.proofImage,

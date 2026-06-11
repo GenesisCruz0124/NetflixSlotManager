@@ -3,11 +3,11 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { CustomersStackParamList } from '../navigation/types';
 import type { Account, Customer, CustomerStatus, NewCustomer } from '../types';
-import { createCustomer, getCustomer, updateCustomer } from '../db/customers';
+import { createCustomer, getCustomer, listCustomers, updateCustomer } from '../db/customers';
 import { listAccounts } from '../db/accounts';
 import DateField from '../components/DateField';
 import { scheduleDueReminder, cancelDueReminder } from '../utils/notifications';
-import { todayIso } from '../utils/format';
+import { formatCurrency, todayIso } from '../utils/format';
 import { colors } from '../utils/theme';
 
 type Props = NativeStackScreenProps<CustomersStackParamList, 'CustomerForm'>;
@@ -20,6 +20,7 @@ export default function CustomerFormScreen({ navigation, route }: Props) {
   const isEditing = customerId != null;
 
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [accountId, setAccountId] = useState<number | null>(null);
   const [name, setName] = useState('');
   const [contactInfo, setContactInfo] = useState('');
@@ -36,10 +37,11 @@ export default function CustomerFormScreen({ navigation, route }: Props) {
 
   useEffect(() => {
     let cancelled = false;
-    listAccounts().then((rows) => {
+    Promise.all([listAccounts(), listCustomers()]).then(([accountRows, customerRows]) => {
       if (cancelled) return;
-      setAccounts(rows);
-      setAccountId((current) => current ?? (rows.length > 0 ? rows[0].id : null));
+      setAccounts(accountRows);
+      setCustomers(customerRows);
+      setAccountId((current) => current ?? (accountRows.length > 0 ? accountRows[0].id : null));
     });
     return () => {
       cancelled = true;
@@ -118,6 +120,9 @@ export default function CustomerFormScreen({ navigation, route }: Props) {
     navigation.goBack();
   };
 
+  const slotsFilledFor = (id: number) =>
+    customers.filter((c) => c.accountId === id && c.status !== 'cancelled').length;
+
   if (!loaded) return null;
 
   if (accounts.length === 0) {
@@ -134,16 +139,29 @@ export default function CustomerFormScreen({ navigation, route }: Props) {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.label}>Netflix account</Text>
-      <View style={styles.row}>
-        {accounts.map((acc) => (
-          <Pressable
-            key={acc.id}
-            style={[styles.chip, accountId === acc.id && styles.chipActive]}
-            onPress={() => setAccountId(acc.id)}
-          >
-            <Text style={[styles.chipText, accountId === acc.id && styles.chipTextActive]}>{acc.label}</Text>
-          </Pressable>
-        ))}
+      <View style={styles.accountList}>
+        {accounts.map((acc) => {
+          const isActive = accountId === acc.id;
+          const filled = slotsFilledFor(acc.id);
+          return (
+            <Pressable
+              key={acc.id}
+              style={[styles.accountCard, isActive && styles.accountCardActive]}
+              onPress={() => setAccountId(acc.id)}
+            >
+              <View style={styles.accountCardBody}>
+                <Text style={styles.accountCardTitle}>{acc.label}</Text>
+                <Text style={styles.accountCardSubtitle}>{acc.netflixEmail || 'No email set'}</Text>
+                <Text style={styles.accountCardMeta}>
+                  {filled} / 5 slots · {formatCurrency(acc.monthlySubscriptionCost)}/mo
+                </Text>
+              </View>
+              <View style={[styles.radioOuter, isActive && styles.radioOuterActive]}>
+                {isActive ? <View style={styles.radioInner} /> : null}
+              </View>
+            </Pressable>
+          );
+        })}
       </View>
 
       <Text style={styles.label}>Name</Text>
@@ -236,6 +254,33 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  accountList: { gap: 10 },
+  accountCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    padding: 14,
+  },
+  accountCardActive: { borderColor: colors.primary, backgroundColor: colors.surfaceAlt },
+  accountCardBody: { flex: 1, marginRight: 12 },
+  accountCardTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
+  accountCardSubtitle: { color: colors.textMuted, fontSize: 13, marginTop: 2 },
+  accountCardMeta: { color: colors.textMuted, fontSize: 12, marginTop: 6 },
+  radioOuter: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radioOuterActive: { borderColor: colors.primary },
+  radioInner: { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.primary },
   chip: {
     paddingVertical: 8,
     paddingHorizontal: 16,
