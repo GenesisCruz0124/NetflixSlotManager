@@ -17,9 +17,19 @@ const STATUS_COLORS: Record<Customer['status'], string> = {
   cancelled: colors.danger,
 };
 
+type SortOption = 'default' | 'name' | 'price' | 'billingDay';
+
+const SORT_OPTIONS: { key: SortOption; label: string }[] = [
+  { key: 'default', label: 'Default' },
+  { key: 'name', label: 'Name' },
+  { key: 'price', label: 'Price' },
+  { key: 'billingDay', label: 'Billing day' },
+];
+
 export default function CustomersListScreen({ navigation }: Props) {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [sortOption, setSortOption] = useState<SortOption>('default');
 
   useFocusEffect(
     useCallback(() => {
@@ -44,6 +54,19 @@ export default function CustomersListScreen({ navigation }: Props) {
   const slotsTaken = customers.filter((c) => c.status !== 'cancelled').length;
   const totalSlots = accounts.length * 5;
 
+  const sortedCustomers = useMemo(() => {
+    if (sortOption === 'default') return customers;
+    const sorted = [...customers];
+    if (sortOption === 'name') {
+      sorted.sort((a, b) => a.name.localeCompare(b.name));
+    } else if (sortOption === 'price') {
+      sorted.sort((a, b) => b.monthlyPrice - a.monthlyPrice);
+    } else if (sortOption === 'billingDay') {
+      sorted.sort((a, b) => a.billingDay - b.billingDay);
+    }
+    return sorted;
+  }, [customers, sortOption]);
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -51,10 +74,23 @@ export default function CustomersListScreen({ navigation }: Props) {
         <Text style={styles.headerSubtitle}>
           {slotsTaken} / {totalSlots} slots in use across {accounts.length} account{accounts.length === 1 ? '' : 's'}
         </Text>
+        <View style={styles.sortRow}>
+          {SORT_OPTIONS.map((option) => (
+            <Pressable
+              key={option.key}
+              style={[styles.sortChip, sortOption === option.key && styles.sortChipActive]}
+              onPress={() => setSortOption(option.key)}
+            >
+              <Text style={[styles.sortChipText, sortOption === option.key && styles.sortChipTextActive]}>
+                {option.label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
       </View>
 
       <FlatList
-        data={customers}
+        data={sortedCustomers}
         keyExtractor={(item) => String(item.id)}
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
@@ -93,6 +129,16 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 },
   headerTitle: { color: colors.text, fontSize: 28, fontWeight: '700' },
   headerSubtitle: { color: colors.textMuted, fontSize: 14, marginTop: 2 },
+  sortRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 12, gap: 8 },
+  sortChip: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    backgroundColor: colors.surfaceAlt,
+  },
+  sortChipActive: { backgroundColor: colors.primary },
+  sortChipText: { color: colors.textMuted, fontSize: 13, fontWeight: '600' },
+  sortChipTextActive: { color: colors.text },
   listContent: { padding: 16, paddingBottom: 100 },
   emptyText: { color: colors.textMuted, textAlign: 'center', marginTop: 40, paddingHorizontal: 24 },
   card: {
