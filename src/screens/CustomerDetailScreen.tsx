@@ -1,9 +1,11 @@
 import { useCallback, useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import * as Clipboard from 'expo-clipboard';
-import type { CustomersStackParamList } from '../navigation/types';
+import type { CustomersStackParamList, RootTabParamList } from '../navigation/types';
 import type { Account, Customer, Payment } from '../types';
 import { deleteCustomer, getCustomer } from '../db/customers';
 import { getAccount, getProfilePin, getStoredPassword } from '../db/accounts';
@@ -12,7 +14,10 @@ import { cancelDueReminder } from '../utils/notifications';
 import { colors } from '../utils/theme';
 import { formatCurrency, formatDate } from '../utils/format';
 
-type Props = NativeStackScreenProps<CustomersStackParamList, 'CustomerDetail'>;
+type Props = CompositeScreenProps<
+  NativeStackScreenProps<CustomersStackParamList, 'CustomerDetail'>,
+  BottomTabScreenProps<RootTabParamList>
+>;
 
 export default function CustomerDetailScreen({ navigation, route }: Props) {
   const { customerId } = route.params;
@@ -202,7 +207,15 @@ export default function CustomerDetailScreen({ navigation, route }: Props) {
         </View>
       ) : null}
 
-      <Text style={styles.sectionTitle}>Payment history</Text>
+      <View style={styles.sectionHeaderRow}>
+        <Text style={styles.sectionTitle}>Payment history</Text>
+        <Pressable
+          style={styles.addPaymentButton}
+          onPress={() => navigation.navigate('Sales', { screen: 'PaymentForm', params: { customerId: customer.id } })}
+        >
+          <Text style={styles.addPaymentButtonText}>+ Add payment</Text>
+        </Pressable>
+      </View>
       <FlatList
         data={payments}
         keyExtractor={(item) => String(item.id)}
@@ -301,7 +314,16 @@ const styles = StyleSheet.create({
   revealLink: { color: colors.primary, fontWeight: '700', fontSize: 13 },
   copyButton: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: colors.surfaceAlt },
   copyButtonText: { color: colors.text, fontWeight: '600', fontSize: 13 },
-  sectionTitle: { color: colors.text, fontSize: 16, fontWeight: '700', marginTop: 16, marginHorizontal: 16 },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 16,
+    marginHorizontal: 16,
+  },
+  sectionTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
+  addPaymentButton: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 8, backgroundColor: colors.primary },
+  addPaymentButtonText: { color: colors.text, fontWeight: '700', fontSize: 13 },
   listContent: { padding: 16, paddingBottom: 60 },
   emptyText: { color: colors.textMuted, textAlign: 'center', marginTop: 24 },
   paymentRow: {

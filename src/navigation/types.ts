@@ -1,3 +1,5 @@
+import type { NavigatorScreenParams } from '@react-navigation/native';
+
 export type CustomersStackParamList = {
   CustomersList: undefined;
   CustomerForm: { customerId?: number } | undefined;
@@ -19,7 +21,7 @@ export type AccountsStackParamList = {
 export type RootTabParamList = {
   Dashboard: undefined;
   Customers: undefined;
-  Sales: undefined;
+  Sales: NavigatorScreenParams<SalesStackParamList> | undefined;
   Accounts: undefined;
   Settings: undefined;
 };
