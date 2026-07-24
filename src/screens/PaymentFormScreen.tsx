@@ -46,8 +46,8 @@ export default function PaymentFormScreen({ navigation, route }: Props) {
   const [customerId, setCustomerId] = useState<number | null>(route.params?.customerId ?? null);
   const [amount, setAmount] = useState('');
   const [datePaid, setDatePaid] = useState(todayIso());
-  const [periodFrom, setPeriodFrom] = useState(todayIso());
-  const [periodTo, setPeriodTo] = useState(todayIso());
+  const [periodFrom, setPeriodFrom] = useState(route.params?.periodFrom ?? todayIso());
+  const [periodTo, setPeriodTo] = useState(route.params?.periodTo ?? todayIso());
   const [method, setMethod] = useState('');
   const [notes, setNotes] = useState('');
   const [proofImage, setProofImage] = useState<string | null>(null);

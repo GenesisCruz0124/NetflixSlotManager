@@ -29,6 +29,16 @@ function clampToMonth(year: number, month: number, day: number): Date {
   return new Date(year, month, Math.min(day, lastDay));
 }
 
+/** Adds `months` to an ISO (YYYY-MM-DD) date, clamping the day to the resulting month's length. */
+export function addMonthsIso(iso: string, months: number): string {
+  const [year, month, day] = iso.split('-').map(Number);
+  const targetMonthIndex = month - 1 + months;
+  const targetYear = year + Math.floor(targetMonthIndex / 12);
+  const targetMonth = ((targetMonthIndex % 12) + 12) % 12;
+  const date = clampToMonth(targetYear, targetMonth, day);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
 /** The next occurrence of `billingDay` (1-31) on or after today, clamped to the month length. */
 export function nextBillingDate(billingDay: number): Date {
   const now = new Date();

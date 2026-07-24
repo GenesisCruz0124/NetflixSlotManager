@@ -8,7 +8,7 @@ export type CustomersStackParamList = {
 
 export type SalesStackParamList = {
   PaymentsList: undefined;
-  PaymentForm: { customerId?: number; paymentId?: number } | undefined;
+  PaymentForm: { customerId?: number; paymentId?: number; periodFrom?: string; periodTo?: string } | undefined;
 };
 
 export type AccountsStackParamList = {

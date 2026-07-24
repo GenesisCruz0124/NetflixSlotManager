@@ -12,7 +12,7 @@ import { getAccount, getProfilePin, getStoredPassword } from '../db/accounts';
 import { listPaymentsForCustomer } from '../db/payments';
 import { cancelDueReminder } from '../utils/notifications';
 import { colors } from '../utils/theme';
-import { formatCurrency, formatDate } from '../utils/format';
+import { addMonthsIso, formatCurrency, formatDate, todayIso } from '../utils/format';
 
 type Props = CompositeScreenProps<
   NativeStackScreenProps<CustomersStackParamList, 'CustomerDetail'>,
@@ -106,6 +106,17 @@ export default function CustomerDetailScreen({ navigation, route }: Props) {
     );
   };
 
+  const handleRenew = () => {
+    if (!customer) return;
+    const lastPeriodTo = payments.reduce((latest, p) => (p.periodTo > latest ? p.periodTo : latest), '');
+    const periodFrom = lastPeriodTo || todayIso();
+    const periodTo = addMonthsIso(periodFrom, 1);
+    navigation.navigate('Sales', {
+      screen: 'PaymentForm',
+      params: { customerId: customer.id, periodFrom, periodTo },
+    });
+  };
+
   if (!customer) return null;
 
   const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
@@ -148,6 +159,9 @@ export default function CustomerDetailScreen({ navigation, route }: Props) {
           onPress={() => navigation.navigate('CustomerForm', { customerId: customer.id })}
         >
           <Text style={styles.actionPrimaryText}>Edit</Text>
+        </Pressable>
+        <Pressable style={[styles.actionButton, styles.actionRenew]} onPress={handleRenew}>
+          <Text style={styles.actionRenewText}>Renew</Text>
         </Pressable>
         <Pressable style={[styles.actionButton, styles.actionDanger]} onPress={handleDelete}>
           <Text style={styles.actionDangerText}>Remove</Text>
@@ -280,6 +294,8 @@ const styles = StyleSheet.create({
   actionButton: { flex: 1, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
   actionPrimary: { backgroundColor: colors.primary },
   actionPrimaryText: { color: colors.text, fontWeight: '700' },
+  actionRenew: { backgroundColor: colors.success },
+  actionRenewText: { color: colors.text, fontWeight: '700' },
   actionDanger: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.danger },
   actionDangerText: { color: colors.danger, fontWeight: '700' },
   detailsToggle: {
