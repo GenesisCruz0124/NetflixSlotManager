@@ -20,7 +20,7 @@ export type AccountsStackParamList = {
 
 export type RootTabParamList = {
   Dashboard: undefined;
-  Customers: undefined;
+  Customers: NavigatorScreenParams<CustomersStackParamList> | undefined;
   Sales: NavigatorScreenParams<SalesStackParamList> | undefined;
   Accounts: undefined;
   Settings: undefined;

@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
@@ -13,7 +13,7 @@ import { currentPeriod, daysUntilNextBilling, formatCurrency, formatDate, nextBi
 
 type Props = BottomTabScreenProps<RootTabParamList, 'Dashboard'>;
 
-export default function DashboardScreen(_props: Props) {
+export default function DashboardScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -88,6 +88,10 @@ export default function DashboardScreen(_props: Props) {
     return last ? `Last paid ${formatDate(last.datePaid)} · ${formatCurrency(last.amount)}` : 'No payments yet';
   };
 
+  const goToMember = (customerId: number) => {
+    navigation.navigate('Customers', { screen: 'CustomerDetail', params: { customerId } });
+  };
+
   return (
     <ScrollView
       style={styles.container}
@@ -120,6 +124,7 @@ export default function DashboardScreen(_props: Props) {
               right={formatCurrency(c.monthlyPrice)}
               accent={colors.warning}
               subtitle={lastPaymentSubtitle(c.id)}
+              onPress={() => goToMember(c.id)}
             />
           ))
         )}
@@ -136,6 +141,7 @@ export default function DashboardScreen(_props: Props) {
               right={days === 0 ? 'Due today' : `in ${days} day${days === 1 ? '' : 's'}`}
               accent={days <= 1 ? colors.danger : colors.warning}
               subtitle={lastPaymentSubtitle(customer.id)}
+              onPress={() => goToMember(customer.id)}
             />
           ))
         )}
@@ -180,20 +186,22 @@ function Row({
   right,
   accent,
   subtitle,
+  onPress,
 }: {
   left: string;
   right: string;
   accent?: string;
   subtitle?: string;
+  onPress?: () => void;
 }) {
   return (
-    <View style={styles.itemRow}>
+    <Pressable style={styles.itemRow} onPress={onPress} disabled={!onPress}>
       <View style={styles.itemLeftCol}>
         <Text style={styles.itemLeft}>{left}</Text>
         {subtitle ? <Text style={styles.itemSubtitle}>{subtitle}</Text> : null}
       </View>
       <Text style={[styles.itemRight, accent ? { color: accent } : null]}>{right}</Text>
-    </View>
+    </Pressable>
   );
 }
 
