@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Alert, Pressable, SectionList, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { File } from 'expo-file-system';
@@ -23,6 +24,7 @@ function deleteProofImage(uri: string | null) {
 type Props = NativeStackScreenProps<SalesStackParamList, 'PaymentsList'>;
 
 export default function PaymentsListScreen({ navigation }: Props) {
+  const insets = useSafeAreaInsets();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
 
@@ -145,7 +147,10 @@ export default function PaymentsListScreen({ navigation }: Props) {
         }}
       />
 
-      <Pressable style={styles.fab} onPress={() => navigation.navigate('PaymentForm', undefined)}>
+      <Pressable
+        style={[styles.fab, { bottom: 24 + insets.bottom }]}
+        onPress={() => navigation.navigate('PaymentForm', undefined)}
+      >
         <Text style={styles.fabText}>+ Log payment</Text>
       </Pressable>
     </View>
@@ -194,7 +199,6 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     right: 20,
-    bottom: 24,
     backgroundColor: colors.primary,
     borderRadius: 28,
     paddingVertical: 14,

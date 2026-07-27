@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { AccountsStackParamList } from '../navigation/types';
@@ -12,6 +13,7 @@ import { formatCurrency } from '../utils/format';
 type Props = NativeStackScreenProps<AccountsStackParamList, 'AccountsList'>;
 
 export default function AccountsListScreen({ navigation }: Props) {
+  const insets = useSafeAreaInsets();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
 
@@ -61,7 +63,10 @@ export default function AccountsListScreen({ navigation }: Props) {
         )}
       />
 
-      <Pressable style={styles.fab} onPress={() => navigation.navigate('AccountForm', undefined)}>
+      <Pressable
+        style={[styles.fab, { bottom: 24 + insets.bottom }]}
+        onPress={() => navigation.navigate('AccountForm', undefined)}
+      >
         <Text style={styles.fabText}>+ Add account</Text>
       </Pressable>
     </View>
@@ -83,7 +88,6 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     right: 20,
-    bottom: 24,
     backgroundColor: colors.primary,
     borderRadius: 28,
     paddingVertical: 14,

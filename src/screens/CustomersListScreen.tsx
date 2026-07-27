@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { CustomersStackParamList } from '../navigation/types';
@@ -27,6 +28,7 @@ const SORT_OPTIONS: { key: SortOption; label: string }[] = [
 ];
 
 export default function CustomersListScreen({ navigation }: Props) {
+  const insets = useSafeAreaInsets();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [sortOption, setSortOption] = useState<SortOption>('default');
@@ -117,7 +119,10 @@ export default function CustomersListScreen({ navigation }: Props) {
         )}
       />
 
-      <Pressable style={styles.fab} onPress={() => navigation.navigate('CustomerForm', undefined)}>
+      <Pressable
+        style={[styles.fab, { bottom: 24 + insets.bottom }]}
+        onPress={() => navigation.navigate('CustomerForm', undefined)}
+      >
         <Text style={styles.fabText}>+ Add member</Text>
       </Pressable>
     </View>
@@ -166,7 +171,6 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     right: 20,
-    bottom: 24,
     backgroundColor: colors.primary,
     borderRadius: 28,
     paddingVertical: 14,
