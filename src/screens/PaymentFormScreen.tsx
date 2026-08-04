@@ -40,15 +40,17 @@ export default function PaymentFormScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const paymentId = route.params?.paymentId;
   const isEditing = paymentId != null;
-  const hasExplicitPeriod = route.params?.periodFrom != null || route.params?.periodTo != null;
+  const routeCustomerId = route.params?.customerId ?? null;
+  const routePeriodFrom = route.params?.periodFrom ?? null;
+  const routePeriodTo = route.params?.periodTo ?? null;
 
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [memberQuery, setMemberQuery] = useState('');
-  const [customerId, setCustomerId] = useState<number | null>(route.params?.customerId ?? null);
+  const [customerId, setCustomerId] = useState<number | null>(routeCustomerId);
   const [amount, setAmount] = useState('');
   const [datePaid, setDatePaid] = useState(todayIso());
-  const [periodFrom, setPeriodFrom] = useState(route.params?.periodFrom ?? todayIso());
-  const [periodTo, setPeriodTo] = useState(route.params?.periodTo ?? todayIso());
+  const [periodFrom, setPeriodFrom] = useState(routePeriodFrom ?? todayIso());
+  const [periodTo, setPeriodTo] = useState(routePeriodTo ?? todayIso());
   const [method, setMethod] = useState('');
   const [notes, setNotes] = useState('');
   const [proofImage, setProofImage] = useState<string | null>(null);
@@ -69,19 +71,48 @@ export default function PaymentFormScreen({ navigation, route }: Props) {
     setPeriodTo(addMonthsIso(from, 1));
   };
 
+  // Keeps the member picker's list fresh; independent of the reset logic below.
   useEffect(() => {
-    listCustomers().then((rows) => {
-      setCustomers(rows);
-      if (isEditing) return;
-      const initialId = customerId ?? (rows.length > 0 ? rows[0].id : null);
-      if (initialId == null) return;
-      if (customerId == null) setCustomerId(initialId);
-      const initialCustomer = rows.find((c) => c.id === initialId);
-      if (initialCustomer && !amount) setAmount(String(initialCustomer.monthlyPrice));
-      if (!hasExplicitPeriod) applyAutoPeriod(initialId);
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    listCustomers().then(setCustomers);
   }, []);
+
+  // Re-initializes the "new payment" form whenever this screen is targeted at logging
+  // one — including when React Navigation reuses an already-mounted instance of this
+  // screen (e.g. opened for one member earlier, then "+ Add payment" tapped for another)
+  // instead of remounting it, which would otherwise leave the previous member's state.
+  useEffect(() => {
+    if (isEditing) return;
+    let cancelled = false;
+    setLoaded(true);
+    const hasExplicitPeriod = routePeriodFrom != null || routePeriodTo != null;
+    listCustomers().then(async (rows) => {
+      if (cancelled) return;
+      const resolvedId = routeCustomerId ?? (rows.length > 0 ? rows[0].id : null);
+      const resolvedCustomer = rows.find((c) => c.id === resolvedId) ?? null;
+
+      setCustomerId(resolvedId);
+      setAmount(resolvedCustomer ? String(resolvedCustomer.monthlyPrice) : '');
+      setDatePaid(todayIso());
+      setMethod('');
+      setNotes('');
+      setProofImage(null);
+      setOriginalProofImage(null);
+
+      if (hasExplicitPeriod) {
+        setPeriodFrom(routePeriodFrom ?? todayIso());
+        setPeriodTo(routePeriodTo ?? todayIso());
+      } else if (resolvedId != null) {
+        await applyAutoPeriod(resolvedId);
+      } else {
+        setPeriodFrom(todayIso());
+        setPeriodTo(todayIso());
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditing, routeCustomerId, routePeriodFrom, routePeriodTo]);
 
   useEffect(() => {
     if (!isEditing) return;
