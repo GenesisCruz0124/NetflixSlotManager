@@ -236,7 +236,10 @@ export default function CustomerDetailScreen({ navigation, route }: Props) {
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={<Text style={styles.emptyText}>No payments recorded yet.</Text>}
         renderItem={({ item }) => (
-          <View style={styles.paymentRow}>
+          <Pressable
+            style={styles.paymentRow}
+            onPress={() => navigation.navigate('Sales', { screen: 'PaymentForm', params: { paymentId: item.id } })}
+          >
             <View>
               <Text style={styles.paymentAmount}>{formatCurrency(item.amount)}</Text>
               <Text style={styles.paymentMeta}>
@@ -244,7 +247,7 @@ export default function CustomerDetailScreen({ navigation, route }: Props) {
                 {item.method ? ` · ${item.method}` : ''}
               </Text>
             </View>
-          </View>
+          </Pressable>
         )}
       />
     </View>
