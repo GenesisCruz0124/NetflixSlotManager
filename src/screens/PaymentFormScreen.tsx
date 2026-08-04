@@ -9,7 +9,7 @@ import type { Customer } from '../types';
 import { listCustomers } from '../db/customers';
 import { createPayment, deletePayment, getPayment, listPaymentsForCustomer, updatePayment } from '../db/payments';
 import DateField from '../components/DateField';
-import { formatCurrency, formatDate, todayIso } from '../utils/format';
+import { addMonthsIso, formatCurrency, formatDate, todayIso } from '../utils/format';
 import { colors } from '../utils/theme';
 
 type Props = NativeStackScreenProps<SalesStackParamList, 'PaymentForm'>;
@@ -40,6 +40,7 @@ export default function PaymentFormScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const paymentId = route.params?.paymentId;
   const isEditing = paymentId != null;
+  const hasExplicitPeriod = route.params?.periodFrom != null || route.params?.periodTo != null;
 
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [memberQuery, setMemberQuery] = useState('');
@@ -60,13 +61,24 @@ export default function PaymentFormScreen({ navigation, route }: Props) {
     navigation.setOptions({ title: isEditing ? 'Edit payment' : 'Log payment' });
   }, [navigation, isEditing]);
 
+  const applyAutoPeriod = async (id: number) => {
+    const customerPayments = await listPaymentsForCustomer(id);
+    const lastPeriodTo = customerPayments.reduce((latest, p) => (p.periodTo > latest ? p.periodTo : latest), '');
+    const from = lastPeriodTo || todayIso();
+    setPeriodFrom(from);
+    setPeriodTo(addMonthsIso(from, 1));
+  };
+
   useEffect(() => {
     listCustomers().then((rows) => {
       setCustomers(rows);
-      if (customerId == null && !isEditing && rows.length > 0) {
-        setCustomerId(rows[0].id);
-        setAmount(String(rows[0].monthlyPrice));
-      }
+      if (isEditing) return;
+      const initialId = customerId ?? (rows.length > 0 ? rows[0].id : null);
+      if (initialId == null) return;
+      if (customerId == null) setCustomerId(initialId);
+      const initialCustomer = rows.find((c) => c.id === initialId);
+      if (initialCustomer && !amount) setAmount(String(initialCustomer.monthlyPrice));
+      if (!hasExplicitPeriod) applyAutoPeriod(initialId);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -95,6 +107,7 @@ export default function PaymentFormScreen({ navigation, route }: Props) {
   const selectCustomer = (customer: Customer) => {
     setCustomerId(customer.id);
     if (!amount) setAmount(String(customer.monthlyPrice));
+    if (!isEditing) applyAutoPeriod(customer.id);
     setMemberPickerVisible(false);
     setMemberQuery('');
   };
