@@ -83,9 +83,10 @@ export default function DashboardScreen({ navigation }: Props) {
     return map;
   }, [payments]);
 
-  const lastPaymentSubtitle = (customerId: number) => {
-    const last = lastPaymentByCustomer.get(customerId);
-    return last ? `Last paid ${formatDate(last.datePaid)} · ${formatCurrency(last.amount)}` : 'No payments yet';
+  const lastPaymentSubtitle = (customer: Customer) => {
+    const last = lastPaymentByCustomer.get(customer.id);
+    const base = last ? `Last paid ${formatDate(last.datePaid)} · ${formatCurrency(last.amount)}` : 'No payments yet';
+    return `${base} · bills on day ${customer.billingDay}`;
   };
 
   const goToMember = (customerId: number) => {
@@ -123,7 +124,7 @@ export default function DashboardScreen({ navigation }: Props) {
               left={c.name}
               right={formatCurrency(c.monthlyPrice)}
               accent={colors.warning}
-              subtitle={lastPaymentSubtitle(c.id)}
+              subtitle={lastPaymentSubtitle(c)}
               onPress={() => goToMember(c.id)}
             />
           ))
@@ -140,7 +141,7 @@ export default function DashboardScreen({ navigation }: Props) {
               left={customer.name}
               right={days === 0 ? 'Due today' : `in ${days} day${days === 1 ? '' : 's'}`}
               accent={days <= 1 ? colors.danger : colors.warning}
-              subtitle={lastPaymentSubtitle(customer.id)}
+              subtitle={lastPaymentSubtitle(customer)}
               onPress={() => goToMember(customer.id)}
             />
           ))
